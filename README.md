@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Python-3.9%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/scikit--learn-pipeline-orange" alt="scikit-learn">
   <img src="https://img.shields.io/badge/Task-binary%20classification-informational" alt="Task">
-  <img src="https://img.shields.io/badge/Best%20ROC--AUC-0.853-success" alt="ROC-AUC">
+  <img src="https://img.shields.io/badge/Best%20ROC--AUC-0.851-success" alt="ROC-AUC">
   <img src="https://img.shields.io/badge/Rows-74%2C498-lightgrey" alt="Rows">
 </p>
 
@@ -38,7 +38,7 @@ Replacing an employee costs time, money and know-how. If a model can flag the gr
 
 | | |
 |---|---|
-| Rows | 74,498 (59,598 train + 14,900 test) |
+| Rows | 74,498 (59,598 train + 14,900 test, stratified 80/20 split) |
 | Columns | 24 (23 features and target, plus Employee ID) |
 | Missing values | 0 |
 | Duplicate rows | 0 |
@@ -97,10 +97,10 @@ The charts and tables show the share of employees in each group who **left** (ov
 
 ```mermaid
 flowchart LR
-    A[train.csv / test.csv] --> B[EDA]
+    A[merged.csv<br/>80/20 stratified split] --> B[EDA]
     A --> C[Preprocessing pipeline]
     C --> D[Baseline]
-    C --> E[5-fold cross-validation<br/>6 models]
+    C --> E[5-fold cross-validation<br/>9 models]
     E --> F[Hyperparameter tuning]
     F --> G[Final evaluation<br/>on untouched test set]
     B --> H[Insights and recommendations]
@@ -110,10 +110,10 @@ flowchart LR
 | Step | What was done |
 |---|---|
 | 1. EDA | Information, duplicates, outliers (IQR, z-score), variance (plus Levene, Bartlett, Fligner-Killeen), skewness, kurtosis, Shapiro, D'Agostino, Q-Q plots, Yeo-Johnson, Pearson and Spearman heatmaps, correlation network, VIF, chi-square, Cramér V, Welch t-test, Mann-Whitney, ANOVA, Kruskal-Wallis |
-| 2. Train and test | Test set kept untouched until the very end |
+| 2. Train and test | `merged.csv` split 80/20 with `train_test_split` (stratified, `random_state=42`). The test set is kept untouched until the very end |
 | 3. Preprocessing | One `ColumnTransformer` in the pipeline: scaling, ordered ordinal encoding, 0/1 binary, one-hot for nominal. No data leaks between cross-validation folds |
 | 4. Baseline | Always predict the most common class |
-| 5. Cross-validation | 5-fold stratified, 6 models: Logistic Regression, Decision Tree, KNN, Random Forest, Extra Trees, Gradient Boosting |
+| 5. Cross-validation | 5-fold stratified, 9 models: Logistic Regression, Decision Tree, KNN, Random Forest, Extra Trees, Gradient Boosting, **XGBoost, LightGBM, CatBoost** |
 | 6. Tuning | `RandomizedSearchCV` (3-fold, ROC-AUC) for every model |
 | 7. Evaluation | Accuracy, precision, recall, F1, ROC-AUC, confusion matrix, ROC curves, permutation importance. The best model is chosen by cross-validation score, not by test score |
 
@@ -123,15 +123,20 @@ flowchart LR
 
 | Model | Tuned CV ROC-AUC | Test accuracy | Precision | Recall | F1 | Test ROC-AUC |
 |---|---|---|---|---|---|---|
-| Baseline (most frequent) | 0.500 | 0.528 | 0.000 | 0.000 | 0.000 | 0.500 |
-| Logistic Regression | 0.828 | 0.743 | 0.732 | 0.719 | 0.725 | 0.831 |
-| Decision Tree | 0.818 | 0.737 | 0.722 | 0.718 | 0.720 | 0.824 |
-| KNN | 0.819 | 0.733 | 0.711 | 0.732 | 0.721 | 0.820 |
-| Random Forest | 0.840 | 0.756 | 0.747 | 0.729 | 0.738 | 0.845 |
-| Extra Trees | 0.834 | 0.751 | 0.736 | 0.737 | 0.737 | 0.840 |
-| **Gradient Boosting** | **0.850** | **0.762** | **0.747** | **0.748** | **0.748** | **0.853** |
+| Baseline (most frequent) | 0.5000 | 0.5252 | 0.0000 | 0.0000 | 0.0000 | 0.5000 |
+| Logistic Regression | 0.8288 | 0.7379 | 0.7160 | 0.7422 | 0.7289 | 0.8287 |
+| Decision Tree | 0.8215 | 0.7335 | 0.7134 | 0.7332 | 0.7232 | 0.8230 |
+| KNN | 0.8177 | 0.7374 | 0.7148 | 0.7436 | 0.7289 | 0.8225 |
+| Random Forest | 0.8410 | 0.7479 | 0.7383 | 0.7263 | 0.7323 | 0.8422 |
+| Extra Trees | 0.8354 | 0.7477 | 0.7317 | 0.7398 | 0.7357 | 0.8377 |
+| Gradient Boosting | 0.8507 | 0.7544 | 0.7384 | 0.7475 | 0.7430 | 0.8500 |
+| XGBoost | 0.8503 | 0.7536 | 0.7385 | 0.7448 | 0.7416 | 0.8492 |
+| LightGBM | 0.8492 | 0.7532 | 0.7383 | 0.7440 | 0.7411 | 0.8486 |
+| **CatBoost** | **0.8523** | **0.7562** | **0.7406** | **0.7489** | **0.7447** | **0.8508** |
 
-**Winner: Gradient Boosting.** It correctly classifies about 3 in 4 employees (76.2%) and treats both classes evenly (precision and recall about 0.75 for Left and 0.77 for Stayed). Its test score is close to its cross-validation score, so it is not just memorising the training data.
+**Winner: CatBoost.** It has the highest tuned cross-validation ROC-AUC (0.852) and the highest test accuracy (75.6%) and test ROC-AUC (0.851). It correctly classifies about 3 in 4 employees and treats both classes evenly (precision and recall about 0.74 and 0.75 for Left, 0.77 and 0.76 for Stayed). Its train accuracy (0.761) is close to its test accuracy (0.756), so it is not just memorising the training data. KNN, by contrast, scores 1.00 on the training data and only 0.74 on the test data, a clear case of overfitting.
+
+**How big is the win?** Small. The four boosting models (CatBoost, Gradient Boosting, XGBoost, LightGBM) are within 0.003 ROC-AUC of each other, a gap that is probably within noise, and all four beat the best non-boosting model (Random Forest, 0.842). The clear result is that boosting works better than the other model families on this data; which boosting library is used matters little.
 
 **Most important features** (permutation importance): Job Level, Marital Status, Remote Work, Work-Life Balance. This agrees with the EDA.
 
@@ -152,22 +157,23 @@ These are suggestions based on the patterns above, not guaranteed fixes.
 |---|---|
 | `employee_attrition_eda.ipynb` | Full exploratory data analysis |
 | `employee_attrition_ml_pipeline.ipynb` | Full ML pipeline (preprocessing, baseline, cross-validation, 6 models, tuning, evaluation) |
+| `employee_attrition_ml_pipeline_boosting.ipynb` | Same pipeline with 3 more boosting models (XGBoost, LightGBM, CatBoost), 9 models in total |
 | `employee_attrition_models.ipynb` | Short version: 3 models, no tuning |
 | `eda_report.html` | EDA as a single report with charts |
 | `images/` | Charts used in this README |
 | `train.csv`, `test.csv`, `merged.csv` | Data |
 
 ```bash
-pip install pandas numpy matplotlib seaborn scipy scikit-learn networkx notebook
+pip install pandas numpy matplotlib seaborn scipy scikit-learn networkx xgboost lightgbm catboost notebook
 jupyter notebook
 ```
 
-Keep the CSV files in the same folder as the notebooks. The tuning cell takes about 15 minutes on one CPU core; lower `N_ITER` to speed it up.
+Keep the CSV files in the same folder as the notebooks. The tuning cell takes roughly 15 to 30 minutes (more with the three boosting models); lower `N_ITER` to speed it up.
 
 ## ⚠️ Limitations
 
 - Findings show **association, not cause**.
-- All models reach only about 76% accuracy, so the available features may be close to their limit. A wider tuning search is unlikely to help much.
+- All models reach only about 75% accuracy, so the available features may be close to their limit. A wider tuning search is unlikely to help much.
 - Default and tuned cross-validation scores are not exactly comparable (5 folds vs 3 folds).
 - Number of Promotions has only values 0 to 4, so its z-score "outliers" are not real outliers.
 - Job Role and Marital Status have no natural order, so they are tested with chi-square and one-hot encoded, not shown in the correlation heatmap.
